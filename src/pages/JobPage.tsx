@@ -46,6 +46,7 @@ const JobPage = () => {
       <Input type="date" placeholder="Date Applied" value={job.dateApplied} onChange={(e) => setJob({...job, dateApplied: e.target.value})} className="mb-4" />
       <Input type="text" placeholder="Extra Details" value={job.extraDetails || ''} onChange={(e) => setJob({...job, extraDetails: e.target.value})} className="mb-4" />
       <Button onClick={updateJob} className="mt-4 bg-green-500">Update</Button>
+        <Button onClick={() => navigate('/')} variant="danger">Sign Out</Button>
     </div>
   );
 };

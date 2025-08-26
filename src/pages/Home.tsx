@@ -72,7 +72,7 @@ const Home = () => {
       <div className="mb-8">
         <Input type="text" placeholder="Company" value={newJob.company} onChange={(e) => setNewJob({ ...newJob, company: e.target.value })} className="mb-4" />
         <Input type="text" placeholder="Role" value={newJob.role} onChange={(e) => setNewJob({ ...newJob, role: e.target.value })} className="mb-4" />
-        <Input type="select" placeholder="Status" value={newJob.status} onChange={(e) => setNewJob({ ...newJob, status: e.target.value as Job['status'] })} className="mb-4" />
+        <Input type="select" placeholder="Status" value={newJob.status} onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => setNewJob({ ...newJob, status: e.target.value as Job['status'] })} className="mb-4" />
         <Input type="date" placeholder="Date Applied" value={newJob.dateApplied} onChange={(e) => setNewJob({ ...newJob, dateApplied: e.target.value })} className="mb-4" />
         <Input type="text" placeholder="Extra Details" value={newJob.extraDetails || ''} onChange={(e) => setNewJob({ ...newJob, extraDetails: e.target.value })} className="mb-4" />
         <Button onClick={addJob} className="mt-4 bg-green-500">Add Job</Button>
@@ -91,7 +91,7 @@ const Home = () => {
           type="select"
           placeholder="Filter by Status"
           value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value as Job['status'])}
+          onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => setStatusFilter(e.target.value as Job['status'])}
           className="mb-4 md:mb-0"
         />
         <Button
@@ -113,6 +113,7 @@ const Home = () => {
           />
         ))}
       </div>
+      <Button onClick={() => navigate('/')} variant="danger">Sign Out</Button>
     </div>
   );
 };
