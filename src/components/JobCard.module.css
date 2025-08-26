@@ -1,0 +1,19 @@
+.jobCard {
+  background: white;
+  border-radius: 0.5rem;
+  transition: box-shadow 0.2s, transform 0.2s;
+  margin-bottom: 1rem; /* Added spacing as per requirements */
+}
+.jobCard:hover {
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  transform: translateY(-0.125rem);
+}
+.applied {
+  border-left: 4px solid yellow;
+}
+.interviewed {
+  border-left: 4px solid green;
+}
+.rejected {
+  border-left: 4px solid red;
+}
