@@ -34,7 +34,15 @@ const JobPage = () => {
       <h1 className="text-2xl mb-4">Job Details</h1>
       <Input type="text" placeholder="Company" value={job.company} onChange={(e) => setJob({...job, company: e.target.value})} className="mb-4" />
       <Input type="text" placeholder="Role" value={job.role} onChange={(e) => setJob({...job, role: e.target.value})} className="mb-4" />
-      <Input type="select" placeholder="Status" value={job.status} onChange={(e) => setJob({...job, status: e.target.value as Job['status']})} className="mb-4" />
+      <Input
+        type="select"
+        placeholder="Status"
+        value={job.status}
+        onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
+          setJob({ ...job, status: e.target.value as Job['status'] })
+        }
+        className="mb-4"
+      />
       <Input type="date" placeholder="Date Applied" value={job.dateApplied} onChange={(e) => setJob({...job, dateApplied: e.target.value})} className="mb-4" />
       <Input type="text" placeholder="Extra Details" value={job.extraDetails || ''} onChange={(e) => setJob({...job, extraDetails: e.target.value})} className="mb-4" />
       <Button onClick={updateJob} className="mt-4 bg-green-500">Update</Button>

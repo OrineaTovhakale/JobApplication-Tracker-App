@@ -1,30 +1,48 @@
 import React from 'react';
 import styles from './Input.module.css';
 
-interface InputProps {
-  type: string;
+interface BaseInputProps {
   placeholder: string;
-  value: string;
+  value: string | number;
   onChange: (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => void;
-  className?: string;
 }
 
-const Input: React.FC<InputProps> = ({ type, placeholder, value, onChange, className = '' }) => {
-  const baseStyles = 'p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-400 focus:border-blue-500 transition-all duration-200 w-full mb-4'; // Space between forms
+interface InputSpecificProps extends React.InputHTMLAttributes<HTMLInputElement> {
+  type?: string;
+}
 
+interface SelectSpecificProps extends React.SelectHTMLAttributes<HTMLSelectElement> {
+  type: 'select';
+}
+
+type InputProps = BaseInputProps & (InputSpecificProps | SelectSpecificProps);
+
+const Input: React.FC<InputProps> = ({ placeholder, type = 'text', value, onChange, ...props }) => {
   if (type === 'select') {
     return (
-      <select value={value} onChange={onChange} className={`${baseStyles} bg-white ${className}`}>
-        <option value="">{placeholder}</option>
-        <option>Applied</option>
-        <option>Interviewed</option>
-        <option>Rejected</option>
+      <select
+        className={styles.select}
+        value={value as string}
+        onChange={onChange}
+        {...(props as SelectSpecificProps)}
+      >
+        <option value="" disabled>{placeholder}</option>
+        <option value="Applied">Applied</option>
+        <option value="Interviewed">Interviewed</option>
+        <option value="Rejected">Rejected</option>
       </select>
     );
   }
 
   return (
-    <input type={type} placeholder={placeholder} value={value} onChange={onChange} className={`${baseStyles} ${className}`} />
+    <input
+      type={type}
+      className={styles.input}
+      placeholder={placeholder}
+      value={value}
+      onChange={onChange}
+      {...(props as InputSpecificProps)}
+    />
   );
 };
 
