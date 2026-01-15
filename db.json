@@ -1,4 +1,20 @@
 {
-  "users": [],
-  "jobs": []
+  "users": [
+    {
+      "id": "977c",
+      "username": "zori",
+      "password": "love"
+    }
+  ],
+  "jobs": [
+    {
+      "id": "f5c2",
+      "company": "lokompo",
+      "role": "artist",
+      "status": "Applied",
+      "dateApplied": "2025-07-28",
+      "extraDetails": "sings about love",
+      "username": "zori"
+    }
+  ]
 }
