@@ -3,6 +3,9 @@ import { useNavigate } from 'react-router-dom';
 import JobCard from '../components/JobCard';
 import Input from '../components/Input';
 import Button from '../components/Button';
+import Toast from '../components/Toast';
+import type { ToastType } from '../components/Toast';
+import ConfirmModal from '../components/ConfirmModal';
 import type { Job } from '../types/Job';
 import { jobService } from '../services';
 import { getCurrentUser, removeCurrentUser, validateJob } from '../utils';
@@ -18,8 +21,14 @@ const Home = () => {
   const [searchStatus, setSearchStatus] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [toast, setToast] = useState<{ message: string; type: ToastType } | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState<{ isOpen: boolean; jobId: number | null }>({ isOpen: false, jobId: null });
   const navigate = useNavigate();
   const username = getCurrentUser() || '';
+
+  const showToast = (message: string, type: ToastType = 'success') => {
+    setToast({ message, type });
+  };
 
   const fetchJobs = useCallback(async () => {
     setLoading(true);
@@ -42,7 +51,6 @@ const Home = () => {
   const addJob = async () => {
     setError('');
     
-    // Validate job
     const validation = validateJob(newJob);
     if (!validation.valid) {
       setError(validation.error || MESSAGES.REQUIRED_FIELDS);
@@ -56,27 +64,38 @@ const Home = () => {
       await fetchJobs();
       setIsAdding(false);
       setNewJob({ company: '', role: '', status: 'Applied', dateApplied: '', extraDetails: '', username: '' });
+      showToast(MESSAGES.JOB_ADDED, 'success');
     } catch (err) {
       console.error(err);
-      setError(MESSAGES.NETWORK_ERROR);
+      showToast(MESSAGES.NETWORK_ERROR, 'error');
     } finally {
       setLoading(false);
     }
   };
 
-  const deleteJob = async (id: number) => {
-    if (!window.confirm(MESSAGES.CONFIRM_DELETE)) return;
+  const handleDeleteClick = (id: number) => {
+    setConfirmDelete({ isOpen: true, jobId: id });
+  };
+
+  const confirmDeleteJob = async () => {
+    if (!confirmDelete.jobId) return;
     
     setLoading(true);
     try {
-      await jobService.deleteJob(id);
+      await jobService.deleteJob(confirmDelete.jobId);
       await fetchJobs();
+      showToast(MESSAGES.JOB_DELETED, 'success');
     } catch (err) {
       console.error(err);
-      setError(MESSAGES.NETWORK_ERROR);
+      showToast(MESSAGES.NETWORK_ERROR, 'error');
     } finally {
       setLoading(false);
+      setConfirmDelete({ isOpen: false, jobId: null });
     }
+  };
+
+  const cancelDelete = () => {
+    setConfirmDelete({ isOpen: false, jobId: null });
   };
 
   const startEdit = (job: Job) => {
@@ -105,7 +124,7 @@ const Home = () => {
       setIsSearching(false);
     } catch (err) {
       console.error(err);
-      setError(MESSAGES.NETWORK_ERROR);
+      showToast(MESSAGES.NETWORK_ERROR, 'error');
     } finally {
       setLoading(false);
     }
@@ -197,7 +216,7 @@ const Home = () => {
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8 homeGrid">
             {jobs.map(job => (
-              <JobCard key={job.id} job={job} onEdit={() => startEdit(job)} onDelete={() => deleteJob(job.id!)} />
+              <JobCard key={job.id} job={job} onEdit={() => startEdit(job)} onDelete={() => handleDeleteClick(job.id!)} />
             ))}
           </div>
         )}
@@ -208,6 +227,26 @@ const Home = () => {
           </Button>
         </div>
       </div>
+
+      {/* Toast Notification */}
+      {toast && (
+        <Toast
+          message={toast.message}
+          type={toast.type}
+          onClose={() => setToast(null)}
+        />
+      )}
+
+      {/* Confirmation Modal */}
+      <ConfirmModal
+        isOpen={confirmDelete.isOpen}
+        title="Delete Job Application?"
+        message={MESSAGES.CONFIRM_DELETE}
+        onConfirm={confirmDeleteJob}
+        onCancel={cancelDelete}
+        confirmText="Delete"
+        cancelText="Cancel"
+      />
     </div>
   );
 };

@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Input from '../components/Input';
 import Button from '../components/Button';
+import Toast from '../components/Toast';
+import type { ToastType } from '../components/Toast';
 import { userService } from '../services';
 import { validateUsername, validatePassword } from '../utils';
 import { MESSAGES } from '../constants';
@@ -11,12 +13,16 @@ const Registration = () => {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [toast, setToast] = useState<{ message: string; type: ToastType } | null>(null);
   const navigate = useNavigate();
+
+  const showToast = (message: string, type: ToastType = 'success') => {
+    setToast({ message, type });
+  };
 
   const handleRegister = async () => {
     setError('');
 
-    // Validate inputs
     const usernameValidation = validateUsername(username);
     if (!usernameValidation.valid) {
       setError(usernameValidation.error || 'Invalid username');
@@ -40,8 +46,8 @@ const Registration = () => {
       }
 
       await userService.register(username, password);
-      alert(MESSAGES.REGISTRATION_SUCCESS);
-      navigate('/login');
+      showToast(MESSAGES.REGISTRATION_SUCCESS, 'success');
+      setTimeout(() => navigate('/login'), 2000);
     } catch (err) {
       console.error(err);
       setError(MESSAGES.NETWORK_ERROR);
@@ -100,6 +106,14 @@ const Registration = () => {
           </Button>
         </div>
       </div>
+
+      {toast && (
+        <Toast
+          message={toast.message}
+          type={toast.type}
+          onClose={() => setToast(null)}
+        />
+      )}
     </div>
   );
 };
