@@ -143,15 +143,15 @@ const Home = () => {
   };
 
   return (
-    <div className="fade-in min-h-screen bg-white p-6">
-      <div className="container mx-auto">
-        <div className="flex justify-between items-center mb-12">
-          <h1 className="text-3xl font-bold text-gray-800">My Job Applications</h1>
-          <div className="flex space-x-6">
-            <Button onClick={() => setIsAdding(!isAdding)} className="bg-blue-500 hover:bg-blue-600 text-white px-6 py-3 rounded-lg transition-all duration-300">
+    <div className="fade-in min-h-screen bg-white p-4 sm:p-6">
+      <div className="container mx-auto max-w-7xl">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-800">My Job Applications</h1>
+          <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
+            <Button onClick={() => setIsAdding(!isAdding)} className="bg-blue-500 hover:bg-blue-600 text-white px-5 py-2.5 rounded-lg transition-all duration-300 whitespace-nowrap">
               Add New Job
             </Button>
-            <Button onClick={() => setIsSearching(!isSearching)} className="bg-blue-500 hover:bg-blue-600 text-white px-6 py-3 rounded-lg transition-all duration-300">
+            <Button onClick={() => setIsSearching(!isSearching)} className="bg-blue-500 hover:bg-blue-600 text-white px-5 py-2.5 rounded-lg transition-all duration-300 whitespace-nowrap">
               Search Jobs
             </Button>
           </div>
@@ -164,20 +164,20 @@ const Home = () => {
         )}
 
         {isAdding && (
-          <div className="card mb-12">
+          <div className="card mb-8">
             <h2 className="text-xl font-semibold mb-6 text-gray-700">Add New Job</h2>
-            <div className="space-y-8">
+            <div className="space-y-4">
               <Input type="text" placeholder="Company *" value={newJob.company} onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => setNewJob({...newJob, company: e.target.value})} />
               <Input type="text" placeholder="Role *" value={newJob.role} onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => setNewJob({...newJob, role: e.target.value})} />
               <Input type="select" placeholder="Select Status" value={newJob.status} onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => setNewJob({...newJob, status: e.target.value as Job['status']})} />
               <Input type="date" placeholder="Date Applied *" value={newJob.dateApplied} onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => setNewJob({...newJob, dateApplied: e.target.value})} />
               <Input type="text" placeholder="Extra Details (optional)" value={newJob.extraDetails || ''} onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => setNewJob({...newJob, extraDetails: e.target.value})} />
             </div>
-            <div className="mt-6 flex space-x-6">
-              <Button onClick={addJob} disabled={loading} className="bg-blue-500 hover:bg-blue-600 text-white px-6 py-3 rounded-lg transition-all duration-300 disabled:opacity-50">
+            <div className="mt-6 flex flex-col sm:flex-row gap-3">
+              <Button onClick={addJob} disabled={loading} className="flex-1 bg-blue-500 hover:bg-blue-600 text-white px-6 py-2.5 rounded-lg transition-all duration-300 disabled:opacity-50">
                 {loading ? 'Saving...' : 'Save Job'}
               </Button>
-              <Button onClick={() => setIsAdding(false)} className="bg-red-500 hover:bg-red-600 text-white px-6 py-3 rounded-lg transition-all duration-300">
+              <Button onClick={() => setIsAdding(false)} className="flex-1 bg-gray-500 hover:bg-gray-600 text-white px-6 py-2.5 rounded-lg transition-all duration-300">
                 Cancel
               </Button>
             </div>
@@ -185,21 +185,21 @@ const Home = () => {
         )}
 
         {isSearching && (
-          <div className="card mb-12">
+          <div className="card mb-8">
             <h2 className="text-xl font-semibold mb-6 text-gray-700">Search Jobs</h2>
-            <div className="space-y-8">
+            <div className="space-y-4">
               <Input type="text" placeholder="Search by Company or Role" value={searchQuery} onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => setSearchQuery(e.target.value)} />
               <Input type="select" placeholder="Filter by Status" value={searchStatus} onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => setSearchStatus(e.target.value as Job['status'])} />
             </div>
-            <div className="mt-6 flex space-x-6">
-              <Button onClick={searchJobs} disabled={loading} className="bg-blue-500 hover:bg-blue-600 text-white px-6 py-3 rounded-lg transition-all duration-300 disabled:opacity-50">
+            <div className="mt-6 flex flex-col sm:flex-row gap-3">
+              <Button onClick={searchJobs} disabled={loading} className="flex-1 bg-blue-500 hover:bg-blue-600 text-white px-5 py-2.5 rounded-lg transition-all duration-300 disabled:opacity-50">
                 {loading ? 'Searching...' : 'Search'}
               </Button>
-              <Button onClick={clearSearch} className="bg-gray-500 hover:bg-gray-600 text-white px-6 py-3 rounded-lg transition-all duration-300">
+              <Button onClick={clearSearch} className="flex-1 bg-gray-500 hover:bg-gray-600 text-white px-5 py-2.5 rounded-lg transition-all duration-300">
                 Clear
               </Button>
-              <Button onClick={() => setIsSearching(false)} className="bg-red-500 hover:bg-red-600 text-white px-6 py-3 rounded-lg transition-all duration-300">
-                Cancel
+              <Button onClick={() => setIsSearching(false)} className="flex-1 bg-gray-500 hover:bg-gray-600 text-white px-5 py-2.5 rounded-lg transition-all duration-300">
+                Close
               </Button>
             </div>
           </div>
@@ -221,8 +221,8 @@ const Home = () => {
           </div>
         )}
 
-        <div className="mt-12">
-          <Button onClick={signOut} className="w-full bg-red-500 hover:bg-red-600 text-white px-6 py-3 rounded-lg transition-all duration-300">
+        <div className="mt-8">
+          <Button onClick={signOut} className="w-full sm:w-auto sm:min-w-[200px] bg-gray-700 hover:bg-gray-800 text-white px-6 py-2.5 rounded-lg transition-all duration-300">
             Sign Out
           </Button>
         </div>

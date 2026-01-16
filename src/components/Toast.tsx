@@ -30,11 +30,11 @@ const Toast: React.FC<ToastProps> = ({
   }[type];
 
   return (
-    <div className={`fixed top-5 right-5 ${bgColor} text-white px-6 py-4 rounded-lg shadow-lg flex items-center space-x-4 animate-slideIn z-50`}>
-      <div className="flex-1">{message}</div>
+    <div className={`fixed top-5 right-5 ${bgColor} text-white px-6 py-4 rounded-lg shadow-2xl flex items-center space-x-4 z-50 max-w-md animate-slideIn`}>
+      <div className="flex-1 font-medium">{message}</div>
       <button
         onClick={onClose}
-        className="text-white hover:text-gray-200 font-bold text-xl"
+        className="text-white hover:text-gray-200 font-bold text-2xl leading-none transition-colors"
         aria-label="Close notification"
       >
         ×
