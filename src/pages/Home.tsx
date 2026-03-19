@@ -8,85 +8,142 @@ import type { ToastType } from '../components/Toast';
 import ConfirmModal from '../components/ConfirmModal';
 import type { Job } from '../types/Job';
 import { jobService } from '../services';
-import { getCurrentUser, removeCurrentUser, validateJob } from '../utils';
+import { getCurrentUser, removeCurrentUser, validateJob, sanitizeInput } from '../utils';
 import { MESSAGES } from '../constants';
-//import './Home.module.css';
 
-const Home = () => {
-  const [jobs, setJobs] = useState<Job[]>([]);
-  const [newJob, setNewJob] = useState<Job>({ company: '', role: '', status: 'Applied', dateApplied: '', extraDetails: '', username: '' });
-  const [isAdding, setIsAdding] = useState(false);
-  const [isSearching, setIsSearching] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
+type SortField = 'dateApplied' | 'company' | 'role';
+type SortDir   = 'asc' | 'desc';
+
+const Panel: React.FC<{ title: string; onClose: () => void; children: React.ReactNode }> = ({ title, onClose, children }) => (
+  <div className="card fade-in" style={{ marginBottom: '1.5rem' }}>
+    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
+      <h2 style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--color-text-primary)' }}>{title}</h2>
+      <button onClick={onClose} aria-label="Close panel" style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-text-muted)', display: 'flex', padding: '4px' }}>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+        </svg>
+      </button>
+    </div>
+    {children}
+  </div>
+);
+
+const StatsBar: React.FC<{ jobs: Job[] }> = ({ jobs }) => {
+  const counts = {
+    total:       jobs.length,
+    applied:     jobs.filter(j => j.status === 'Applied').length,
+    interviewed: jobs.filter(j => j.status === 'Interviewed').length,
+    rejected:    jobs.filter(j => j.status === 'Rejected').length,
+  };
+  const Stat = ({ label, count, color }: { label: string; count: number; color: string }) => (
+    <div style={{ textAlign: 'center' }}>
+      <p style={{ fontSize: '1.5rem', fontWeight: 800, color, lineHeight: 1 }}>{count}</p>
+      <p style={{ fontSize: '0.72rem', color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 600, marginTop: '3px' }}>{label}</p>
+    </div>
+  );
+  const Div = () => <div style={{ width: '1px', background: 'var(--color-border)', alignSelf: 'stretch' }} />;
+  return (
+    <div className="card" style={{ display: 'flex', justifyContent: 'space-around', alignItems: 'center', padding: '1.25rem', marginBottom: '1.5rem' }}>
+      <Stat label="Total"       count={counts.total}       color="var(--color-text-primary)" />
+      <Div /><Stat label="Applied"     count={counts.applied}     color="var(--color-amber)"  />
+      <Div /><Stat label="Interviewed" count={counts.interviewed} color="var(--color-green)"  />
+      <Div /><Stat label="Rejected"    count={counts.rejected}    color="var(--color-red)"    />
+    </div>
+  );
+};
+
+const sortJobs = (jobs: Job[], field: SortField, dir: SortDir): Job[] =>
+  [...jobs].sort((a, b) => {
+    let valA: string | number = field === 'dateApplied' ? new Date(a.dateApplied).getTime() : a[field].toLowerCase();
+    let valB: string | number = field === 'dateApplied' ? new Date(b.dateApplied).getTime() : b[field].toLowerCase();
+    if (valA < valB) return dir === 'asc' ? -1 : 1;
+    if (valA > valB) return dir === 'asc' ?  1 : -1;
+    return 0;
+  });
+
+const filterJobs = (jobs: Job[], query: string, status: string): Job[] =>
+  jobs.filter(j => {
+    const matchesQuery = !query || j.company.toLowerCase().includes(query.toLowerCase()) || j.role.toLowerCase().includes(query.toLowerCase());
+    const matchesStatus = !status || j.status === status;
+    return matchesQuery && matchesStatus;
+  });
+
+const emptyJob: Job = { company: '', role: '', status: 'Applied', dateApplied: '', extraDetails: '', username: '' };
+
+const Home: React.FC = () => {
+  const [allJobs, setAllJobs]           = useState<Job[]>([]);
+  const [displayJobs, setDisplayJobs]   = useState<Job[]>([]);
+  const [newJob, setNewJob]             = useState<Job>(emptyJob);
+  const [isAdding, setIsAdding]         = useState(false);
+  const [isSearching, setIsSearching]   = useState(false);
+  const [searchQuery, setSearchQuery]   = useState('');
   const [searchStatus, setSearchStatus] = useState('');
-  const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [toast, setToast] = useState<{ message: string; type: ToastType } | null>(null);
+  const [sortField, setSortField]       = useState<SortField>('dateApplied');
+  const [sortDir, setSortDir]           = useState<SortDir>('desc');
+  const [formError, setFormError]       = useState('');
+  const [fetchError, setFetchError]     = useState('');
+  const [loading, setLoading]           = useState(false);
+  const [toast, setToast]               = useState<{ message: string; type: ToastType } | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<{ isOpen: boolean; jobId: number | null }>({ isOpen: false, jobId: null });
   const navigate = useNavigate();
-  const username = getCurrentUser() || '';
+  const username = getCurrentUser() ?? '';
 
-  const showToast = (message: string, type: ToastType = 'success') => {
-    setToast({ message, type });
-  };
+  const showToast = (message: string, type: ToastType = 'success') => setToast({ message, type });
 
   const fetchJobs = useCallback(async () => {
     setLoading(true);
+    setFetchError('');
     try {
       const data = await jobService.getJobsByUsername(username);
-      data.sort((a: Job, b: Job) => new Date(b.dateApplied).getTime() - new Date(a.dateApplied).getTime());
-      setJobs(data);
-    } catch (err) {
-      console.error(err);
-      setError(MESSAGES.NETWORK_ERROR);
+      setAllJobs(data);
+    } catch {
+      setFetchError(MESSAGES.NETWORK_ERROR);
     } finally {
       setLoading(false);
     }
   }, [username]);
 
+  useEffect(() => { fetchJobs(); }, [fetchJobs]);
+
   useEffect(() => {
-    fetchJobs();
-  }, [fetchJobs]);
+    const filtered = filterJobs(allJobs, searchQuery, searchStatus);
+    const sorted   = sortJobs(filtered, sortField, sortDir);
+    setDisplayJobs(sorted);
+  }, [allJobs, searchQuery, searchStatus, sortField, sortDir]);
 
   const addJob = async () => {
-    setError('');
-    
-    const validation = validateJob(newJob);
-    if (!validation.valid) {
-      setError(validation.error || MESSAGES.REQUIRED_FIELDS);
-      return;
-    }
-
+    setFormError('');
+    const sanitized: Job = {
+      ...newJob,
+      company: sanitizeInput(newJob.company),
+      role: sanitizeInput(newJob.role),
+      extraDetails: newJob.extraDetails ? sanitizeInput(newJob.extraDetails) : '',
+      username,
+    };
+    const validation = validateJob(sanitized);
+    if (!validation.valid) { setFormError(validation.error ?? MESSAGES.REQUIRED_FIELDS); return; }
     setLoading(true);
     try {
-      const jobWithUser: Job = { ...newJob, username };
-      await jobService.createJob(jobWithUser);
+      await jobService.createJob(sanitized);
       await fetchJobs();
       setIsAdding(false);
-      setNewJob({ company: '', role: '', status: 'Applied', dateApplied: '', extraDetails: '', username: '' });
-      showToast(MESSAGES.JOB_ADDED, 'success');
-    } catch (err) {
-      console.error(err);
+      setNewJob(emptyJob);
+      showToast(MESSAGES.JOB_ADDED);
+    } catch {
       showToast(MESSAGES.NETWORK_ERROR, 'error');
     } finally {
       setLoading(false);
     }
   };
 
-  const handleDeleteClick = (id: number) => {
-    setConfirmDelete({ isOpen: true, jobId: id });
-  };
-
   const confirmDeleteJob = async () => {
     if (!confirmDelete.jobId) return;
-    
     setLoading(true);
     try {
       await jobService.deleteJob(confirmDelete.jobId);
       await fetchJobs();
-      showToast(MESSAGES.JOB_DELETED, 'success');
-    } catch (err) {
-      console.error(err);
+      showToast(MESSAGES.JOB_DELETED);
+    } catch {
       showToast(MESSAGES.NETWORK_ERROR, 'error');
     } finally {
       setLoading(false);
@@ -94,158 +151,160 @@ const Home = () => {
     }
   };
 
-  const cancelDelete = () => {
-    setConfirmDelete({ isOpen: false, jobId: null });
+  const toggleSort = (field: SortField) => {
+    if (sortField === field) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
+    else { setSortField(field); setSortDir('asc'); }
   };
 
-  const startEdit = (job: Job) => {
-    navigate(`/jobs/${job.id}`);
-  };
-
-  const searchJobs = async () => {
-    setError('');
-    setLoading(true);
-    try {
-      let data = await jobService.getJobsByUsername(username);
-      
-      if (searchQuery) {
-        data = data.filter((j: Job) => 
-          j.company.toLowerCase().includes(searchQuery.toLowerCase()) || 
-          j.role.toLowerCase().includes(searchQuery.toLowerCase())
-        );
-      }
-      
-      if (searchStatus) {
-        data = data.filter((j: Job) => j.status === searchStatus);
-      }
-      
-      data.sort((a: Job, b: Job) => new Date(b.dateApplied).getTime() - new Date(a.dateApplied).getTime());
-      setJobs(data);
-      setIsSearching(false);
-    } catch (err) {
-      console.error(err);
-      showToast(MESSAGES.NETWORK_ERROR, 'error');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const clearSearch = () => {
-    setSearchQuery('');
-    setSearchStatus('');
-    fetchJobs();
-    setIsSearching(false);
-  };
-
-  const signOut = () => {
-    removeCurrentUser();
-    navigate('/');
+  const SortBtn: React.FC<{ field: SortField; label: string }> = ({ field, label }) => {
+    const active = sortField === field;
+    return (
+      <button onClick={() => toggleSort(field)} style={{
+        padding: '5px 12px', borderRadius: 'var(--radius-sm)',
+        border: `1.5px solid ${active ? 'var(--color-indigo)' : 'var(--color-border)'}`,
+        background: active ? 'var(--color-indigo-soft)' : 'var(--color-surface)',
+        color: active ? 'var(--color-indigo)' : 'var(--color-text-secondary)',
+        fontSize: '0.8rem', fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font-sans)',
+        display: 'inline-flex', alignItems: 'center', gap: '4px', transition: 'all var(--transition)',
+      }}>
+        {label}{active && <span>{sortDir === 'asc' ? '↑' : '↓'}</span>}
+      </button>
+    );
   };
 
   return (
-    <div className="fade-in min-h-screen bg-white p-4 sm:p-6">
-      <div className="container mx-auto max-w-7xl">
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
-          <h1 className="text-2xl sm:text-3xl font-bold text-gray-800">My Job Applications</h1>
-          <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
-            <Button onClick={() => setIsAdding(!isAdding)} className="bg-blue-500 hover:bg-blue-600 text-white px-5 py-2.5 rounded-lg transition-all duration-300 whitespace-nowrap">
-              Add New Job
+    <div className="fade-in" style={{ minHeight: '100vh', background: 'var(--color-bg)', padding: '2rem 1rem' }}>
+      <div style={{ maxWidth: '1100px', margin: '0 auto' }}>
+
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.75rem', flexWrap: 'wrap', gap: '1rem' }}>
+          <div>
+            <h1 style={{ fontSize: '1.6rem', fontWeight: 800, color: 'var(--color-text-primary)', letterSpacing: '-0.02em' }}>My Applications</h1>
+            <p style={{ color: 'var(--color-text-secondary)', fontSize: '0.875rem', marginTop: '2px' }}>Signed in as <strong>{username}</strong></p>
+          </div>
+          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+            <Button variant="primary" onClick={() => { setIsSearching(s => !s); setIsAdding(false); }}>
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+              Filter
             </Button>
-            <Button onClick={() => setIsSearching(!isSearching)} className="bg-blue-500 hover:bg-blue-600 text-white px-5 py-2.5 rounded-lg transition-all duration-300 whitespace-nowrap">
-              Search Jobs
+            <Button variant="primary" onClick={() => { setIsAdding(s => !s); setIsSearching(false); setFormError(''); }}>
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+              Add Job
             </Button>
           </div>
         </div>
 
-        {error && (
-          <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700">
-            {error}
+        {allJobs.length > 0 && <StatsBar jobs={allJobs} />}
+
+        {fetchError && (
+          <div style={{ padding: '12px 16px', borderRadius: 'var(--radius-md)', background: 'var(--color-red-soft)', border: '1px solid #fca5a5', color: 'var(--color-red)', fontSize: '0.875rem', marginBottom: '1.25rem' }}>
+            {fetchError}
           </div>
         )}
 
         {isAdding && (
-          <div className="card mb-8">
-            <h2 className="text-xl font-semibold mb-6 text-gray-700">Add New Job</h2>
-            <div className="space-y-4">
-              <Input type="text" placeholder="Company *" value={newJob.company} onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => setNewJob({...newJob, company: e.target.value})} />
-              <Input type="text" placeholder="Role *" value={newJob.role} onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => setNewJob({...newJob, role: e.target.value})} />
-              <Input type="select" placeholder="Select Status" value={newJob.status} onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => setNewJob({...newJob, status: e.target.value as Job['status']})} />
-              <Input type="date" placeholder="Date Applied *" value={newJob.dateApplied} onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => setNewJob({...newJob, dateApplied: e.target.value})} />
-              <Input type="text" placeholder="Extra Details (optional)" value={newJob.extraDetails || ''} onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => setNewJob({...newJob, extraDetails: e.target.value})} />
+          <Panel title="New Job Application" onClose={() => { setIsAdding(false); setFormError(''); }}>
+            {formError && (
+              <div style={{ padding: '10px 14px', borderRadius: 'var(--radius-sm)', background: 'var(--color-red-soft)', color: 'var(--color-red)', fontSize: '0.85rem', marginBottom: '1rem', border: '1px solid #fca5a5' }}>
+                {formError}
+              </div>
+            )}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px', marginBottom: '1.25rem' }}>
+              <div>
+                <label htmlFor="company-input" style={{ fontWeight: 600, fontSize: '0.9rem', marginBottom: '4px', display: 'block' }}>Company *</label>
+                <Input id="company-input" type="text" placeholder="e.g. Google" value={newJob.company} onChange={e => setNewJob({ ...newJob, company: e.target.value })} />
+              </div>
+              <div>
+                <label htmlFor="role-input" style={{ fontWeight: 600, fontSize: '0.9rem', marginBottom: '4px', display: 'block' }}>Role *</label>
+                <Input id="role-input" type="text" placeholder="e.g. Software Engineer" value={newJob.role} onChange={e => setNewJob({ ...newJob, role: e.target.value })} />
+              </div>
+              <div>
+                <label htmlFor="status-input" style={{ fontWeight: 600, fontSize: '0.9rem', marginBottom: '4px', display: 'block' }}>Status</label>
+                <Input id="status-input" type="select" placeholder="Select Status" value={newJob.status} onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => setNewJob({ ...newJob, status: e.target.value as Job['status'] })} />
+              </div>
+              <div>
+                <label htmlFor="date-applied-input" style={{ fontWeight: 600, fontSize: '0.9rem', marginBottom: '4px', display: 'block' }}>Date Applied *</label>
+                <div>
+                  <label htmlFor="extra-details-input" style={{ fontWeight: 600, fontSize: '0.9rem', marginBottom: '4px', display: 'block' }}>Extra Details (optional)</label>
+                  <Input id="extra-details-input" type="text" placeholder="Notes, recruiter name, referral…" value={newJob.extraDetails ?? ''} onChange={e => setNewJob({ ...newJob, extraDetails: e.target.value })} />
+                </div>
+              </div>
+              <div style={{ gridColumn: '1/-1' }}>
+                <label htmlFor="extra-details-input-bottom" style={{ fontWeight: 600, fontSize: '0.9rem', marginBottom: '4px', display: 'block' }}>Extra Details (optional)</label>
+                <Input id="extra-details-input-bottom" type="text" placeholder="Notes, recruiter name, referral…" value={newJob.extraDetails ?? ''} onChange={e => setNewJob({ ...newJob, extraDetails: e.target.value })} />
+              </div>
             </div>
-            <div className="mt-6 flex flex-col sm:flex-row gap-3">
-              <Button onClick={addJob} disabled={loading} className="flex-1 bg-blue-500 hover:bg-blue-600 text-white px-6 py-2.5 rounded-lg transition-all duration-300 disabled:opacity-50">
-                {loading ? 'Saving...' : 'Save Job'}
-              </Button>
-              <Button onClick={() => setIsAdding(false)} className="flex-1 bg-gray-500 hover:bg-gray-600 text-white px-6 py-2.5 rounded-lg transition-all duration-300">
-                Cancel
-              </Button>
+            <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+              <Button onClick={() => { setIsAdding(false); setFormError(''); }}>Cancel</Button>
+              <Button variant="primary"   onClick={addJob} disabled={loading}>{loading ? 'Saving…' : 'Save Job'}</Button>
             </div>
-          </div>
+          </Panel>
         )}
 
         {isSearching && (
-          <div className="card mb-8">
-            <h2 className="text-xl font-semibold mb-6 text-gray-700">Search Jobs</h2>
-            <div className="space-y-4">
-              <Input type="text" placeholder="Search by Company or Role" value={searchQuery} onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => setSearchQuery(e.target.value)} />
-              <Input type="select" placeholder="Filter by Status" value={searchStatus} onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => setSearchStatus(e.target.value as Job['status'])} />
+          <Panel title="Filter Applications" onClose={() => setIsSearching(false)}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px', marginBottom: '1.25rem' }}>
+              <Input type="text" placeholder="Search…" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} />
+              <Input type="select" placeholder="All statuses" value={searchStatus} onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => setSearchStatus(e.target.value)} />
             </div>
-            <div className="mt-6 flex flex-col sm:flex-row gap-3">
-              <Button onClick={searchJobs} disabled={loading} className="flex-1 bg-blue-500 hover:bg-blue-600 text-white px-5 py-2.5 rounded-lg transition-all duration-300 disabled:opacity-50">
-                {loading ? 'Searching...' : 'Search'}
-              </Button>
-              <Button onClick={clearSearch} className="flex-1 bg-gray-500 hover:bg-gray-600 text-white px-5 py-2.5 rounded-lg transition-all duration-300">
-                Clear
-              </Button>
-              <Button onClick={() => setIsSearching(false)} className="flex-1 bg-gray-500 hover:bg-gray-600 text-white px-5 py-2.5 rounded-lg transition-all duration-300">
-                Close
-              </Button>
+            <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+              <Button onClick={() => { setSearchQuery(''); setSearchStatus(''); }}>Clear filters</Button>
+              <Button variant="primary" onClick={() => setIsSearching(false)}>Done</Button>
             </div>
+          </Panel>
+        )}
+
+        {allJobs.length > 0 && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '1rem', flexWrap: 'wrap' }}>
+            <span style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)', fontWeight: 600, marginRight: '4px' }}>Sort:</span>
+            <SortBtn field="dateApplied" label="Date"    />
+            <SortBtn field="company"     label="Company" />
+            <SortBtn field="role"        label="Role"    />
+            <span style={{ marginLeft: 'auto', fontSize: '0.8rem', color: 'var(--color-text-muted)' }}>
+              {displayJobs.length} of {allJobs.length} application{allJobs.length !== 1 ? 's' : ''}
+            </span>
           </div>
         )}
 
-        {loading && !isAdding && !isSearching ? (
-          <div className="text-center py-12">
-            <p className="text-gray-600">Loading jobs...</p>
-          </div>
-        ) : jobs.length === 0 ? (
-          <div className="text-center py-12">
-            <p className="text-gray-600 text-lg">No job applications yet. Start by adding one!</p>
+        {loading && !isAdding ? (
+          <div style={{ textAlign: 'center', padding: '4rem 0', color: 'var(--color-text-muted)' }}>Loading applications…</div>
+        ) : displayJobs.length === 0 ? (
+          <div style={{ textAlign: 'center', padding: '5rem 0' }}>
+            <p style={{ fontSize: '2.5rem', marginBottom: '1rem' }}>📋</p>
+            <p style={{ color: 'var(--color-text-secondary)', fontSize: '1rem', fontWeight: 600 }}>
+              {allJobs.length === 0 ? 'No applications yet' : 'No results match your filters'}
+            </p>
+            <p style={{ color: 'var(--color-text-muted)', fontSize: '0.875rem', marginTop: '6px' }}>
+              {allJobs.length === 0 ? 'Click "Add Job" to get started' : 'Try clearing your filters'}
+            </p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8 homeGrid">
-            {jobs.map(job => (
-              <JobCard key={job.id} job={job} onEdit={() => startEdit(job)} onDelete={() => handleDeleteClick(job.id!)} />
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '1rem' }}>
+            {displayJobs.map(job => (
+              <JobCard
+                key={job.id}
+                job={job}
+                onEdit={() => navigate(`/jobs/${job.id}`)}
+                onDelete={() => setConfirmDelete({ isOpen: true, jobId: job.id! })}
+              />
             ))}
           </div>
         )}
 
-        <div className="mt-8">
-          <Button onClick={signOut} className="w-full sm:w-auto sm:min-w-[200px] bg-gray-700 hover:bg-gray-800 text-white px-6 py-2.5 rounded-lg transition-all duration-300">
-            Sign Out
+        <div style={{ marginTop: '2.5rem', paddingTop: '1.5rem', borderTop: '1px solid var(--color-border)', display: 'flex', justifyContent: 'flex-end' }}>
+          <Button variant="primary" onClick={() => { removeCurrentUser(); navigate('/'); }}>
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/>
+            </svg>
+            Sign out
           </Button>
         </div>
       </div>
 
-      {/* Toast Notification */}
-      {toast && (
-        <Toast
-          message={toast.message}
-          type={toast.type}
-          onClose={() => setToast(null)}
-        />
-      )}
-
-      {/* Confirmation Modal */}
+      {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
       <ConfirmModal
-        isOpen={confirmDelete.isOpen}
-        title="Delete Job Application?"
-        message={MESSAGES.CONFIRM_DELETE}
-        onConfirm={confirmDeleteJob}
-        onCancel={cancelDelete}
-        confirmText="Delete"
-        cancelText="Cancel"
+        isOpen={confirmDelete.isOpen} title="Delete Application?" message={MESSAGES.CONFIRM_DELETE}
+        onConfirm={confirmDeleteJob} onCancel={() => setConfirmDelete({ isOpen: false, jobId: null })}
+        confirmText="Delete" cancelText="Cancel"
       />
     </div>
   );
