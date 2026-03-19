@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import AuthLayout from '../components/AuthLayout';
 import Input from '../components/Input';
 import Button from '../components/Button';
 import { userService } from '../services';
@@ -15,89 +16,50 @@ const Login = () => {
 
   const handleLogin = async () => {
     setError('');
-    
-    // Validate inputs
-    const usernameValidation = validateUsername(username);
-    if (!usernameValidation.valid) {
-      setError(usernameValidation.error || 'Invalid username');
-      return;
-    }
-
-    const passwordValidation = validatePassword(password);
-    if (!passwordValidation.valid) {
-      setError(passwordValidation.error || 'Invalid password');
-      return;
-    }
+    const uv = validateUsername(username);
+    if (!uv.valid) { setError(uv.error ?? 'Invalid username'); return; }
+    const pv = validatePassword(password);
+    if (!pv.valid) { setError(pv.error ?? 'Invalid password'); return; }
 
     setLoading(true);
     try {
       const users = await userService.login(username, password);
-      
       if (users.length && users[0].password === password) {
         setCurrentUser(username);
         navigate('/home');
       } else {
         setError(MESSAGES.INVALID_CREDENTIALS);
       }
-    } catch (err) {
-      console.error(err);
+    } catch {
       setError(MESSAGES.NETWORK_ERROR);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') {
-      handleLogin();
-    }
-  };
+  const handleKeyDown = (e: React.KeyboardEvent) => { if (e.key === 'Enter') handleLogin(); };
 
   return (
-    <div className="fade-in min-h-screen bg-white p-6">
-      <div className="container mx-auto">
-        <div className="card w-full max-w-md mx-auto">
-          <div className="flex justify-start mb-12">
-            <Button onClick={() => navigate(-1)} className="bg-blue-500 hover:bg-blue-600 text-white px-6 py-3 rounded-lg transition-all duration-300">
-              Back
-            </Button>
-          </div>
-          
-          <h1 className="mb-12 text-3xl font-bold text-gray-800 text-center">Login</h1>
-          
-          {error && (
-            <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700">
-              {error}
-            </div>
-          )}
-          
-          <div className="space-y-8">
-            <Input 
-              type="text" 
-              placeholder="Username" 
-              value={username} 
-              onChange={(e) => setUsername(e.target.value)}
-              onKeyPress={handleKeyPress}
-            />
-            <Input 
-              type="password" 
-              placeholder="Password" 
-              value={password} 
-              onChange={(e) => setPassword(e.target.value)}
-              onKeyPress={handleKeyPress}
-            />
-          </div>
-          
-          <Button 
-            onClick={handleLogin} 
-            disabled={loading}
-            className="mt-12 bg-blue-500 hover:bg-blue-600 text-white px-6 py-3 rounded-lg transition-all duration-300 w-full disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {loading ? 'Logging in...' : 'Login'}
-          </Button>
+    <AuthLayout title="Welcome back" subtitle="Sign in to your account">
+      {error && (
+        <div style={{ padding: '12px 16px', borderRadius: 'var(--radius-md)', background: 'var(--color-red-soft)', border: '1px solid #fca5a5', color: 'var(--color-red)', fontSize: '0.875rem', marginBottom: '1.25rem' }}>
+          {error}
         </div>
+      )}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginBottom: '1.5rem' }}>
+        <Input type="text" placeholder="e.g. johndoe" value={username} onChange={e => setUsername(e.target.value)} onKeyDown={handleKeyDown as any} />
+        <Input type="password" placeholder="••••••••" value={password} onChange={e => setPassword(e.target.value)} onKeyDown={handleKeyDown as any} />
       </div>
-    </div>
+      <Button variant="primary" onClick={handleLogin} disabled={loading} >
+        {loading ? 'Signing in…' : 'Sign in'}
+      </Button>
+      <p style={{ textAlign: 'center', marginTop: '1.25rem', fontSize: '0.875rem', color: 'var(--color-text-secondary)' }}>
+        No account?{' '}
+        <span onClick={() => navigate('/register')} style={{ color: 'var(--color-indigo)', fontWeight: 600, cursor: 'pointer' }}>
+          Create one
+        </span>
+      </p>
+    </AuthLayout>
   );
 };
 
