@@ -7,174 +7,165 @@ import type { ToastType } from '../components/Toast';
 import ConfirmModal from '../components/ConfirmModal';
 import type { Job } from '../types/Job';
 import { jobService } from '../services';
-import { getCurrentUser, removeCurrentUser, validateJob } from '../utils';
+import { getCurrentUser, removeCurrentUser, validateJob, sanitizeInput } from '../utils';
 import { MESSAGES } from '../constants';
-//import './JobPage.module.css';
 
-const JobPage = () => {
-  const { id } = useParams<{ id: string }>();
-  const [job, setJob] = useState<Job | null>(null);
-  const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [toast, setToast] = useState<{ message: string; type: ToastType } | null>(null);
-  const [confirmDelete, setConfirmDelete] = useState(false);
+const JobPage: React.FC = () => {
+  const { id }   = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const username = getCurrentUser() || '';
+  const username = getCurrentUser() ?? '';
 
-  const showToast = (message: string, type: ToastType = 'success') => {
-    setToast({ message, type });
-  };
+  const [job, setJob]                 = useState<Job | null>(null);
+  const [formError, setFormError]     = useState('');
+  const [loading, setLoading]         = useState(false);
+  const [toast, setToast]             = useState<{ message: string; type: ToastType } | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+
+  const showToast = (message: string, type: ToastType = 'success') => setToast({ message, type });
 
   const fetchJob = useCallback(async () => {
+    if (!id) return;
     setLoading(true);
     try {
-      const data = await jobService.getJobById(id!);
-      if (data.username !== username) {
-        navigate('/home');
-        return;
-      }
+      const data = await jobService.getJobById(id);
+      if (data.username !== username) { navigate('/home'); return; }
       setJob(data);
-    } catch (err) {
-      console.error(err);
-      setError(MESSAGES.NETWORK_ERROR);
+    } catch {
+      setFormError(MESSAGES.NETWORK_ERROR);
     } finally {
       setLoading(false);
     }
   }, [id, username, navigate]);
 
-  useEffect(() => {
-    fetchJob();
-  }, [fetchJob]);
+  useEffect(() => { fetchJob(); }, [fetchJob]);
 
   const updateJob = async () => {
     if (!job) return;
-    
-    setError('');
-    
-    const validation = validateJob(job);
-    if (!validation.valid) {
-      setError(validation.error || MESSAGES.REQUIRED_FIELDS);
-      return;
-    }
-
+    setFormError('');
+    const sanitized: Job = {
+      ...job,
+      company:      sanitizeInput(job.company),
+      role:         sanitizeInput(job.role),
+      extraDetails: job.extraDetails ? sanitizeInput(job.extraDetails) : '',
+    };
+    const validation = validateJob(sanitized);
+    if (!validation.valid) { setFormError(validation.error ?? MESSAGES.REQUIRED_FIELDS); return; }
     setLoading(true);
     try {
-      await jobService.updateJob(id!, job);
-      showToast(MESSAGES.JOB_UPDATED, 'success');
+      await jobService.updateJob(id!, sanitized);
+      showToast(MESSAGES.JOB_UPDATED);
       setTimeout(() => navigate('/home'), 1500);
-    } catch (err) {
-      console.error(err);
+    } catch {
       showToast(MESSAGES.NETWORK_ERROR, 'error');
     } finally {
       setLoading(false);
     }
   };
 
-  const confirmDeleteJob = async () => {
+  const handleDeleteConfirmed = async () => {
     if (!job) return;
-    
     setLoading(true);
     try {
       await jobService.deleteJob(job.id!);
-      showToast(MESSAGES.JOB_DELETED, 'success');
+      showToast(MESSAGES.JOB_DELETED);
       setTimeout(() => navigate('/home'), 1500);
-    } catch (err) {
-      console.error(err);
+    } catch {
       showToast(MESSAGES.NETWORK_ERROR, 'error');
       setLoading(false);
     }
     setConfirmDelete(false);
   };
 
-  const signOut = () => {
-    removeCurrentUser();
-    navigate('/');
-  };
+  if (loading && !job) return (
+    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--color-bg)' }}>
+      <p style={{ color: 'var(--color-text-muted)' }}>Loading application…</p>
+    </div>
+  );
 
-  if (loading && !job) {
-    return (
-      <div className="fade-in flex items-center justify-center min-h-screen bg-white p-6">
-        <p className="text-gray-600">Loading job details...</p>
-      </div>
-    );
-  }
-
-  if (!job) {
-    return (
-      <div className="fade-in flex items-center justify-center min-h-screen bg-white p-6">
-        <p className="text-gray-600">Job not found</p>
-      </div>
-    );
-  }
+  if (!loading && !job) return (
+    <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '16px', background: 'var(--color-bg)' }}>
+      <p style={{ color: 'var(--color-text-secondary)', fontWeight: 600 }}>Application not found.</p>
+      <Button variant="primary" onClick={() => navigate('/home')}>Back to applications</Button>
+    </div>
+  );
 
   return (
-    <div className="fade-in min-h-screen bg-white p-6">
-      <div className="container mx-auto">
+    <div className="fade-in" style={{ minHeight: '100vh', background: 'var(--color-bg)', padding: '2rem 1rem' }}>
+      <div style={{ maxWidth: '640px', margin: '0 auto' }}>
+        <div style={{ marginBottom: '1.5rem' }}>
+          <Button variant="primary" onClick={() => navigate(-1)}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/>
+            </svg>
+            Back
+          </Button>
+        </div>
+
         <div className="card">
-          <div className="flex justify-between items-center mb-12">
-            <Button onClick={() => navigate(-1)} className="bg-blue-500 hover:bg-blue-600 text-white px-6 py-3 rounded-lg transition-all duration-300">
-              Back
-            </Button>
-          </div>
-          
-          <h1 className="mb-12 text-3xl font-bold text-gray-800 text-center">Job Details</h1>
-          
-          {error && (
-            <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700">
-              {error}
+          <h1 style={{ fontSize: '1.35rem', fontWeight: 800, color: 'var(--color-text-primary)', marginBottom: '1.75rem', letterSpacing: '-0.01em' }}>
+            Edit Application
+          </h1>
+
+          {formError && (
+            <div style={{ padding: '12px 16px', borderRadius: 'var(--radius-md)', background: 'var(--color-red-soft)', border: '1px solid #fca5a5', color: 'var(--color-red)', fontSize: '0.875rem', marginBottom: '1.25rem' }}>
+              {formError}
             </div>
           )}
-          
-          <div className="space-y-8 formGrid">
-            <Input type="text" placeholder="Company *" value={job.company} onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => setJob({...job, company: e.target.value})} />
-            <Input type="text" placeholder="Role *" value={job.role} onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => setJob({...job, role: e.target.value})} />
-            <Input type="select" placeholder="Select Status" value={job.status} onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => setJob({...job, status: e.target.value as Job['status']})} />
-            <Input type="date" placeholder="Date Applied *" value={job.dateApplied} onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => setJob({...job, dateApplied: e.target.value})} />
-            <Input type="text" placeholder="Extra Details (optional)" value={job.extraDetails || ''} onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => setJob({...job, extraDetails: e.target.value})} />
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginBottom: '1.75rem' }}>
+            <label>
+              Company *
+              <Input type="text" placeholder="e.g. Google" value={job!.company} onChange={e => setJob({ ...job!, company: e.target.value })} />
+            </label>
+            <label>
+              Role *
+              <Input type="text" placeholder="e.g. Software Engineer" value={job!.role} onChange={e => setJob({ ...job!, role: e.target.value })} />
+            </label>
+            <label>
+              Status
+              <Input
+                type="select"
+                placeholder="Select Status"
+                value={job!.status}
+                onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => setJob({ ...job!, status: e.target.value as Job['status'] })}
+              />
+            </label>
+            <label>
+              Date Applied *
+              <Input type="date" placeholder="Date Applied" value={job!.dateApplied} onChange={e => setJob({ ...job!, dateApplied: e.target.value })} />
+            </label>
+            <label>
+              Extra Details (optional)
+              <Input type="text" placeholder="Notes, recruiter, referral…" value={job!.extraDetails ?? ''} onChange={e => setJob({ ...job!, extraDetails: e.target.value })} />
+            </label>
           </div>
-          
-          <Button 
-            onClick={updateJob} 
-            disabled={loading}
-            className="mt-12 bg-blue-500 hover:bg-blue-600 text-white px-6 py-3 rounded-lg transition-all duration-300 w-full disabled:opacity-50"
-          >
-            {loading ? 'Updating...' : 'Update'}
+
+          <Button variant="primary" onClick={updateJob} disabled={loading} >
+            {loading ? 'Updating…' : 'Update Application'}
           </Button>
-          
-          <div className="mt-12">
-            <Button 
-              onClick={() => setConfirmDelete(true)} 
-              disabled={loading}
-              className="bg-red-500 hover:bg-red-600 text-white px-6 py-3 rounded-lg transition-all duration-300 w-full disabled:opacity-50"
-            >
-              Delete Job
+
+          <div style={{ marginTop: '10px' }}>
+            <Button variant="danger" onClick={() => setConfirmDelete(true)} disabled={loading} >
+              Delete Application
             </Button>
           </div>
-          
-          <div className="mt-12">
-            <Button onClick={signOut} className="w-full bg-red-500 hover:bg-red-600 text-white px-6 py-3 rounded-lg transition-all duration-300">
-              Sign Out
+
+          <div style={{ marginTop: '1.75rem', paddingTop: '1.25rem', borderTop: '1px solid var(--color-border)', display: 'flex', justifyContent: 'flex-end' }}>
+            <Button onClick={() => { removeCurrentUser(); navigate('/'); }}>
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/>
+              </svg>
+              Sign out
             </Button>
           </div>
         </div>
       </div>
 
-      {toast && (
-        <Toast
-          message={toast.message}
-          type={toast.type}
-          onClose={() => setToast(null)}
-        />
-      )}
-
+      {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
       <ConfirmModal
-        isOpen={confirmDelete}
-        title="Delete Job Application?"
-        message={MESSAGES.CONFIRM_DELETE}
-        onConfirm={confirmDeleteJob}
-        onCancel={() => setConfirmDelete(false)}
-        confirmText="Delete"
-        cancelText="Cancel"
+        isOpen={confirmDelete} title="Delete Application?" message={MESSAGES.CONFIRM_DELETE}
+        onConfirm={handleDeleteConfirmed} onCancel={() => setConfirmDelete(false)}
+        confirmText="Delete" cancelText="Cancel"
       />
     </div>
   );
