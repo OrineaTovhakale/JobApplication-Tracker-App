@@ -68,7 +68,9 @@ const filterJobs = (jobs: Job[], query: string, status: string): Job[] =>
     return matchesQuery && matchesStatus;
   });
 
-const emptyJob: Job = { company: '', role: '', status: 'Applied', dateApplied: '', extraDetails: '', username: '' };
+const getTodayDate = (): string => new Date().toISOString().split('T')[0];
+
+const emptyJob: Job = { company: '', role: '', status: 'Applied', dateApplied: getTodayDate(), extraDetails: '', username: '' };
 
 const Home: React.FC = () => {
   const [allJobs, setAllJobs]           = useState<Job[]>([]);
