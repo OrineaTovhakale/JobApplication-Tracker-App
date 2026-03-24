@@ -4,6 +4,7 @@ import type { Job } from '../types/Job';
 const statusConfig: Record<Job['status'], { cls: string; accent: string }> = {
   Applied:     { cls: 'badge badge-applied',      accent: 'var(--color-amber)'  },
   Interviewed: { cls: 'badge badge-interviewed',  accent: 'var(--color-green)'  },
+  Offered:     { cls: 'badge badge-offered',      accent: 'var(--color-indigo)' },
   Rejected:    { cls: 'badge badge-rejected',     accent: 'var(--color-red)'    },
 };
 
@@ -23,6 +24,8 @@ interface JobCardProps {
 const JobCard: React.FC<JobCardProps> = ({ job, onEdit, onDelete }) => {
   const { cls, accent } = statusConfig[job.status];
   const [hovered, setHovered] = React.useState(false);
+  const [editHovered, setEditHovered] = React.useState(false);
+  const [deleteHovered, setDeleteHovered] = React.useState(false);
 
   const formattedDate = (() => {
     try {
@@ -52,6 +55,7 @@ const JobCard: React.FC<JobCardProps> = ({ job, onEdit, onDelete }) => {
         transition: 'box-shadow var(--transition), transform var(--transition)',
       }}
     >
+      {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px' }}>
         <div>
           <p style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '3px' }}>
@@ -64,11 +68,13 @@ const JobCard: React.FC<JobCardProps> = ({ job, onEdit, onDelete }) => {
         <span className={cls} style={{ flexShrink: 0 }}>{job.status}</span>
       </div>
 
+      {/* Date */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '5px', color: 'var(--color-text-muted)', fontSize: '0.82rem' }}>
         <CalendarIcon />
         {formattedDate}
       </div>
 
+      {/* Extra details */}
       {job.extraDetails && (
         <p style={{
           fontSize: '0.83rem', color: 'var(--color-text-secondary)', lineHeight: 1.55,
@@ -79,32 +85,47 @@ const JobCard: React.FC<JobCardProps> = ({ job, onEdit, onDelete }) => {
         </p>
       )}
 
+      {/* Actions */}
       <div style={{ display: 'flex', gap: '8px', borderTop: '1px solid var(--color-border)', paddingTop: '12px', marginTop: '2px' }}>
         <button
           onClick={onEdit}
+          onMouseEnter={() => setEditHovered(true)}
+          onMouseLeave={() => setEditHovered(false)}
           style={{
-            flex: 1, height: '36px', borderRadius: 'var(--radius-sm)',
-            border: '1.5px solid var(--color-border)', background: 'var(--color-surface)',
-            fontSize: '0.83rem', fontWeight: 600, cursor: 'pointer',
-            color: 'var(--color-text-primary)', fontFamily: 'var(--font-sans)',
+            flex: 1,
+            height: '36px',
+            borderRadius: 'var(--radius-sm)',
+            border: editHovered
+              ? '1.5px solid var(--color-indigo)'
+              : '1.5px solid var(--color-border)',
+            background: 'var(--color-surface)',
+            fontSize: '0.83rem',
+            fontWeight: 600,
+            cursor: 'pointer',
+            color: editHovered ? 'var(--color-indigo)' : 'var(--color-text-primary)',
+            fontFamily: 'var(--font-sans)',
             transition: 'all var(--transition)',
           }}
-          onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = 'var(--color-indigo)'; (e.currentTarget as HTMLButtonElement).style.color = 'var(--color-indigo)'; }}
-          onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = 'var(--color-border)'; (e.currentTarget as HTMLButtonElement).style.color = 'var(--color-text-primary)'; }}
         >
           Edit
         </button>
         <button
           onClick={onDelete}
+          onMouseEnter={() => setDeleteHovered(true)}
+          onMouseLeave={() => setDeleteHovered(false)}
           style={{
-            flex: 1, height: '36px', borderRadius: 'var(--radius-sm)',
-            border: '1.5px solid transparent', background: 'var(--color-red-soft)',
-            fontSize: '0.83rem', fontWeight: 600, cursor: 'pointer',
-            color: 'var(--color-red)', fontFamily: 'var(--font-sans)',
+            flex: 1,
+            height: '36px',
+            borderRadius: 'var(--radius-sm)',
+            border: '1.5px solid transparent',
+            background: deleteHovered ? 'var(--color-red)' : 'var(--color-red-soft)',
+            fontSize: '0.83rem',
+            fontWeight: 600,
+            cursor: 'pointer',
+            color: deleteHovered ? '#fff' : 'var(--color-red)',
+            fontFamily: 'var(--font-sans)',
             transition: 'all var(--transition)',
           }}
-          onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--color-red)'; (e.currentTarget as HTMLButtonElement).style.color = '#fff'; }}
-          onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--color-red-soft)'; (e.currentTarget as HTMLButtonElement).style.color = 'var(--color-red)'; }}
         >
           Delete
         </button>
